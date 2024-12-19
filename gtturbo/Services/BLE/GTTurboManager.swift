@@ -76,6 +76,7 @@ final class GTTurboManager: NSObject, ObservableObject {
               let peripheral = peripheral else { return }
         
         let command: [UInt8] = [BLEConstants.startCommand]
+        print("Sending START command (0x01) to GT TURBO")
         peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
     }
     
@@ -92,6 +93,7 @@ final class GTTurboManager: NSObject, ObservableObject {
               let peripheral = peripheral else { return }
         
         let command: [UInt8] = [BLEConstants.stopCommand]
+        print("Sending STOP command (0x02) to GT TURBO")
         peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
     }
 }
@@ -200,6 +202,14 @@ extension GTTurboManager: CBPeripheralDelegate {
             }
         default:
             break
+        }
+    }
+    
+    func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        if error == nil {
+            print("Command successfully sent to GT TURBO")
+        } else {
+            print("Error sending command: \(error?.localizedDescription ?? "Unknown error")")
         }
     }
 } 
