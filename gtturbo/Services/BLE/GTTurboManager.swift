@@ -47,12 +47,10 @@ final class GTTurboManager: NSObject, ObservableObject {
         guard centralManager.state == .poweredOn else { return }
         isScanning = true
         discoveredDevices.removeAll()
+        
+        // Scan for devices advertising the Battery Service (which our device advertises)
         centralManager.scanForPeripherals(
-            withServices: [
-                CBUUID(string: BLEConstants.batteryServiceUUID),
-                CBUUID(string: BLEConstants.writeServiceUUID),
-                CBUUID(string: BLEConstants.readServiceUUID)
-            ],
+            withServices: [CBUUID(string: BLEConstants.batteryServiceUUID)],
             options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
         )
     }
@@ -88,6 +86,14 @@ final class GTTurboManager: NSObject, ObservableObject {
             self.isScanning = false
         }
     }
+    
+    func stopMeasurement() {
+        guard let characteristic = writeCharacteristic,
+              let peripheral = peripheral else { return }
+        
+        let command: [UInt8] = [BLEConstants.stopCommand]
+        peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
+    }
 }
 
 // MARK: - CBCentralManagerDelegate
@@ -102,9 +108,22 @@ extension GTTurboManager: CBCentralManagerDelegate {
     }
     
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
-        let device = BLEDevice(peripheral: peripheral, rssi: RSSI.intValue)
-        if !discoveredDevices.contains(where: { $0.id == device.id }) {
-            discoveredDevices.append(device)
+        // Debug logging
+        print("Found device: \(peripheral.name ?? "Unknown")")
+        print("Identifier: \(peripheral.identifier)")
+        print("RSSI: \(RSSI)")
+        print("Advertisement data:")
+        advertisementData.forEach { key, value in
+            print("  \(key): \(value)")
+        }
+        
+        // Check if this is our GT TURBO device
+        if peripheral.name == "GT TURBO" {
+            print("Found GT TURBO device!")
+            let device = BLEDevice(peripheral: peripheral, rssi: RSSI.intValue)
+            if !discoveredDevices.contains(where: { $0.id == device.id }) {
+                discoveredDevices.append(device)
+            }
         }
     }
     

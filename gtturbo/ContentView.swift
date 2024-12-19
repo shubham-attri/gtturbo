@@ -41,7 +41,7 @@ struct MeasurementDetailView: View {
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
+    @Query(sort: [SortDescriptor(\Item.timestamp, order: .reverse)]) private var items: [Item]
     @StateObject private var bleManager = GTTurboManager()
     @State private var showingDeviceList = false
     @State private var debugLogs: [DebugLog] = []
@@ -50,65 +50,93 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List {
-                // Connection Section
+                // Connection Status Section
                 Section {
-                    VStack(spacing: 24) {
-                        // Status Text
-                        Text("Scan for GT TURBO")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                        
-                        // Connection Status Indicator
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(statusColor)
-                                .frame(width: 12, height: 12)
-                            Text(connectionStatusText)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        // Scan Button
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 12, height: 12)
+                        Text(connectionStatusText)
+                            .font(.subheadline)
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                    
+                    // Only show scan button and available devices when disconnected
+                    if bleManager.connectionState == .disconnected {
                         Button(action: {
                             toggleScan()
                             logAction(bleManager.isScanning ? "Started scanning" : "Stopped scanning")
                         }) {
-                            Text(bleManager.isScanning ? "Stop Scan" : "Scan")
+                            Text(bleManager.isScanning ? "Stop Scan" : "Scan for GT TURBO")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 50)
+                                .frame(height: 44)
                                 .background(bleManager.isScanning ? Color.red.opacity(0.1) : Color.blue)
                                 .foregroundColor(bleManager.isScanning ? .red : .white)
                                 .cornerRadius(12)
                         }
-                        .disabled(bleManager.connectionState == GTTurboManager.ConnectionState.connected)
                         
-                        // Measurement Controls (only show when connected)
-                        if case GTTurboManager.ConnectionState.connected = bleManager.connectionState {
-                            VStack(spacing: 16) {
-                                if let battery = bleManager.batteryLevel {
-                                    BatteryIndicator(level: battery)
-                                        .padding(.bottom, 8)
-                                }
-                                
-                                Button(action: toggleMeasurement) {
-                                    HStack {
-                                        Image(systemName: isCollectingData ? "stop.circle.fill" : "play.circle.fill")
-                                            .font(.system(size: 24))
-                                        Text(isCollectingData ? "Stop" : "Start")
+                        // Only show available devices when disconnected
+                        if !bleManager.discoveredDevices.isEmpty {
+                            ForEach(bleManager.discoveredDevices) { device in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(device.name)
                                             .font(.headline)
+                                        Text("RSSI: \(device.rssi) dBm")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
                                     }
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 50)
-                                    .background(isCollectingData ? Color.red : Color.green)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    bleManager.connect(to: device)
+                                    logAction("Connecting to \(device.name)")
                                 }
                             }
-                            .padding(.top, 8)
                         }
                     }
-                    .padding(.vertical)
+                } header: {
+                    Text("Connection")
+                }
+                
+                // Connected Device Section - Only show when connected
+                if case .connected = bleManager.connectionState {
+                    Section {
+                        HStack {
+                            Text("GT TURBO")
+                                .font(.headline)
+                            Spacer()
+                            if let battery = bleManager.batteryLevel {
+                                BatteryIndicator(level: battery)
+                            }
+                        }
+                    } header: {
+                        Text("Connected Device")
+                    }
+                    
+                    // Measurement Section - Separate section for measurement controls
+                    Section {
+                        Button(action: toggleMeasurement) {
+                            HStack {
+                                Image(systemName: isCollectingData ? "stop.circle.fill" : "play.circle.fill")
+                                    .font(.system(size: 24))
+                                Text(isCollectingData ? "Stop Measurement" : "Start Measurement")
+                                    .font(.headline)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(isCollectingData ? Color.red : Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                        }
+                    } header: {
+                        Text("Measurement")
+                    }
                 }
                 
                 // Measurements Section
@@ -227,7 +255,7 @@ struct ContentView: View {
             bleManager.startMeasurement()
             logAction("Started measurement")
         } else {
-            // Add stop measurement functionality to GTTurboManager
+            bleManager.stopMeasurement()
             logAction("Stopped measurement")
         }
     }
@@ -246,16 +274,15 @@ struct ContentView: View {
     }
     
     private var statusColor: Color {
-        if bleManager.isScanning {
-            return .yellow
-        }
         switch bleManager.connectionState {
         case .connected:
-            return .green
+            return .yellow
+        case .connecting:
+            return .blue
         case .error:
             return .red
-        default:
-            return .red
+        case .disconnected:
+            return bleManager.isScanning ? .blue : .red
         }
     }
     
@@ -326,11 +353,9 @@ struct DebugLog: Identifiable {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: Item.self, configurations: config)
     
-    // Create preview with container
     ContentView()
         .modelContainer(container)
         .onAppear {
-            // Add sample data
             let context = container.mainContext
             let sampleItem = Item(timestamp: Date(), deviceId: "Mock Device", sensorData: [1.0, 2.0, 3.0])
             context.insert(sampleItem)
