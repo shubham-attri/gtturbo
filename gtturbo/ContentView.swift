@@ -41,7 +41,7 @@ struct MeasurementDetailView: View {
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: [SortDescriptor(\Item.timestamp, order: .reverse)]) private var items: [Item]
+    @Query(sort: \Item.timestamp, order: .reverse) private var items: [Item]
     @StateObject private var bleManager = GTTurboManager()
     @State private var showingDeviceList = false
     @State private var debugLogs: [DebugLog] = []
@@ -81,10 +81,10 @@ struct ContentView: View {
                                 .foregroundColor(bleManager.isScanning ? .red : .white)
                                 .cornerRadius(12)
                         }
-                        .disabled(bleManager.connectionState == .connected)
+                        .disabled(bleManager.connectionState == GTTurboManager.ConnectionState.connected)
                         
                         // Measurement Controls (only show when connected)
-                        if case .connected = bleManager.connectionState {
+                        if case GTTurboManager.ConnectionState.connected = bleManager.connectionState {
                             VStack(spacing: 16) {
                                 if let battery = bleManager.batteryLevel {
                                     BatteryIndicator(level: battery)
@@ -325,15 +325,14 @@ struct DebugLog: Identifiable {
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: Item.self, configurations: config)
-    let preview = ContentView()
+    
+    // Create preview with container
+    ContentView()
         .modelContainer(container)
-    
-    // Add sample data after creating the view
-    Task { @MainActor in
-        let context = container.mainContext
-        let sampleItem = Item(timestamp: Date(), deviceId: "Mock Device", sensorData: [1.0, 2.0, 3.0])
-        context.insert(sampleItem)
-    }
-    
-    return preview
+        .onAppear {
+            // Add sample data
+            let context = container.mainContext
+            let sampleItem = Item(timestamp: Date(), deviceId: "Mock Device", sensorData: [1.0, 2.0, 3.0])
+            context.insert(sampleItem)
+        }
 }
