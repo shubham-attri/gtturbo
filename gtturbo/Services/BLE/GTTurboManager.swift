@@ -2,6 +2,10 @@ import Foundation
 import CoreBluetooth
 import Combine
 
+extension Notification.Name {
+    static let newNIRDataReceived = Notification.Name("newNIRDataReceived")
+}
+
 final class GTTurboManager: NSObject, ObservableObject {
     // MARK: - Published Properties
     @Published var discoveredDevices: [BLEDevice] = []
@@ -75,9 +79,12 @@ final class GTTurboManager: NSObject, ObservableObject {
         guard let characteristic = writeCharacteristic,
               let peripheral = peripheral else { return }
         
-        let command: [UInt8] = [BLEConstants.startCommand]
-        print("Sending START command (0x01) to GT TURBO")
-        peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
+        // Get current timestamp and convert to bytes
+        let currentTimestamp = UInt32(Date().timeIntervalSince1970)
+        var timestampBytes = withUnsafeBytes(of: currentTimestamp) { Array($0) }
+        
+        print("Sending timestamp \(currentTimestamp) to GT TURBO")
+        peripheral.writeValue(Data(timestampBytes), for: characteristic, type: .withResponse)
     }
     
     func simulateConnection() {
@@ -92,7 +99,7 @@ final class GTTurboManager: NSObject, ObservableObject {
         guard let characteristic = writeCharacteristic,
               let peripheral = peripheral else { return }
         
-        let command: [UInt8] = [BLEConstants.stopCommand]
+        let command: [UInt8] = [BLEConstants.stopCommand] // 0x02
         print("Sending STOP command (0x02) to GT TURBO")
         peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
     }
@@ -197,8 +204,13 @@ extension GTTurboManager: CBPeripheralDelegate {
         case BLEConstants.notifyCharUUID:
             if let data = characteristic.value {
                 let nirData = NIRSpectrographyData(data: data)
-                // Handle the NIR data
                 print("Received NIR data with timestamp: \(nirData.timestamp)")
+                // Store the received data
+                NotificationCenter.default.post(
+                    name: .newNIRDataReceived,
+                    object: nil,
+                    userInfo: ["data": nirData]
+                )
             }
         default:
             break

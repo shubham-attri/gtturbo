@@ -46,6 +46,8 @@ struct ContentView: View {
     @State private var showingDeviceList = false
     @State private var debugLogs: [DebugLog] = []
     @State private var isCollectingData = false
+    @State private var showStartConfirmation = false
+    @State private var showStopConfirmation = false
     
     var body: some View {
         NavigationSplitView {
@@ -121,21 +123,76 @@ struct ContentView: View {
                     
                     // Measurement Section - Separate section for measurement controls
                     Section {
-                        Button(action: toggleMeasurement) {
-                            HStack {
-                                Image(systemName: isCollectingData ? "stop.circle.fill" : "play.circle.fill")
-                                    .font(.system(size: 24))
-                                Text(isCollectingData ? "Stop Measurement" : "Start Measurement")
-                                    .font(.headline)
+                        VStack(spacing: 16) {
+                            // Start Button
+                            Button {
+                                // Show confirmation dialog for starting
+                                showStartConfirmation = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "play.circle.fill")
+                                        .font(.system(size: 24))
+                                    Text("Start Tracking")
+                                        .font(.headline)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(isCollectingData ? Color.red : Color.green)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+                            .disabled(isCollectingData)
+                            .confirmationDialog(
+                                "Start Tracking",
+                                isPresented: $showStartConfirmation,
+                                titleVisibility: .visible
+                            ) {
+                                Button("Start") {
+                                    isCollectingData = true
+                                    bleManager.startMeasurement()
+                                    logAction("Started measurement")
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("Do you want to start tracking measurements?")
+                            }
+                            
+                            // Stop Button
+                            Button {
+                                // Show confirmation dialog for stopping
+                                showStopConfirmation = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "stop.circle.fill")
+                                        .font(.system(size: 24))
+                                    Text("Stop Tracking")
+                                        .font(.headline)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(Color.red)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
+                            }
+                            .disabled(!isCollectingData)
+                            .confirmationDialog(
+                                "Stop Tracking",
+                                isPresented: $showStopConfirmation,
+                                titleVisibility: .visible
+                            ) {
+                                Button("Stop", role: .destructive) {
+                                    isCollectingData = false
+                                    bleManager.stopMeasurement()
+                                    logAction("Stopped measurement")
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("Are you sure you want to stop tracking?")
+                            }
                         }
+                        .padding(.vertical, 8)
                     } header: {
-                        Text("Measurement")
+                        Text("Tracking")
                     }
                 }
                 
@@ -246,17 +303,6 @@ struct ContentView: View {
             bleManager.stopScanning()
         } else {
             bleManager.startScanning()
-        }
-    }
-    
-    private func toggleMeasurement() {
-        isCollectingData.toggle()
-        if isCollectingData {
-            bleManager.startMeasurement()
-            logAction("Started measurement")
-        } else {
-            bleManager.stopMeasurement()
-            logAction("Stopped measurement")
         }
     }
     
