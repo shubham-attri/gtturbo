@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		2616B28B2D148556006F36AB /* iOS-BLE-Library in Frameworks */ = {isa = PBXBuildFile; productRef = 2616B28A2D148556006F36AB /* iOS-BLE-Library */; };
+		2616B28D2D148556006F36AB /* iOS-BLE-Library-Mock in Frameworks */ = {isa = PBXBuildFile; productRef = 2616B28C2D148556006F36AB /* iOS-BLE-Library-Mock */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		2616B2612D148345006F36AB /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +57,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2616B28D2D148556006F36AB /* iOS-BLE-Library-Mock in Frameworks */,
+				2616B28B2D148556006F36AB /* iOS-BLE-Library in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +119,8 @@
 			);
 			name = gtturbo;
 			packageProductDependencies = (
+				2616B28A2D148556006F36AB /* iOS-BLE-Library */,
+				2616B28C2D148556006F36AB /* iOS-BLE-Library-Mock */,
 			);
 			productName = gtturbo;
 			productReference = 2616B24E2D148342006F36AB /* gtturbo.app */;
@@ -195,6 +204,9 @@
 			);
 			mainGroup = 2616B2452D148342006F36AB;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				2616B2892D148556006F36AB /* XCRemoteSwiftPackageReference "IOS-BLE-Library" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2616B24F2D148342006F36AB /* Products */;
 			projectDirPath = "";
@@ -558,6 +570,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2616B2892D148556006F36AB /* XCRemoteSwiftPackageReference "IOS-BLE-Library" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/NordicSemiconductor/IOS-BLE-Library.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.3.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2616B28A2D148556006F36AB /* iOS-BLE-Library */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2616B2892D148556006F36AB /* XCRemoteSwiftPackageReference "IOS-BLE-Library" */;
+			productName = "iOS-BLE-Library";
+		};
+		2616B28C2D148556006F36AB /* iOS-BLE-Library-Mock */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2616B2892D148556006F36AB /* XCRemoteSwiftPackageReference "IOS-BLE-Library" */;
+			productName = "iOS-BLE-Library-Mock";
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2616B2462D148342006F36AB /* Project object */;
 }

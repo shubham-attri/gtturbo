@@ -10,23 +10,22 @@ import SwiftData
 
 @main
 struct gtturboApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
+    let container: ModelContainer
+    
+    init() {
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let schema = Schema([Item.self])
+            let config = ModelConfiguration("GTTurbo", schema: schema)
+            container = try ModelContainer(for: schema, configurations: config)
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            fatalError("Could not configure SwiftData container: \(error)")
         }
-    }()
-
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .modelContainer(container)
         }
-        .modelContainer(sharedModelContainer)
     }
 }

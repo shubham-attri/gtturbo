@@ -1,0 +1,24 @@
+{
+  "originHash" : "8b00788b5473b7d42e22a143c4f8dec967f148360fa058547498269c127376db",
+  "pins" : [
+    {
+      "identity" : "ios-ble-library",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/NordicSemiconductor/IOS-BLE-Library.git",
+      "state" : {
+        "revision" : "4a5e8b297d7545875c2f0e85e2aa890690a7bbd4",
+        "version" : "0.3.3"
+      }
+    },
+    {
+      "identity" : "ios-corebluetooth-mock",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/NordicSemiconductor/IOS-CoreBluetooth-Mock.git",
+      "state" : {
+        "revision" : "500b23852e7d46b63ef8e2a826c2b6f3f6ed50ef",
+        "version" : "0.18.0"
+      }
+    }
+  ],
+  "version" : 3
+}
