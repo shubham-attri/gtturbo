@@ -221,6 +221,9 @@ struct ContentView: View {
                                         .font(.headline)
                                     Text(file.deviceId)
                                         .font(.caption)
+                                    Text(statusText(for: file.status))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
                                 
                                 Spacer()
@@ -391,6 +394,15 @@ struct ContentView: View {
         case .uploading: return .yellow
         case .uploaded: return .green
         case .none: return .gray
+        }
+    }
+    
+    private func statusText(for status: GTTurboManager.FileStatus) -> String {
+        switch status {
+        case .none: return "Idle"
+        case .receiving: return "Receiving Data"
+        case .uploading: return "Uploading..."
+        case .uploaded: return "Uploaded"
         }
     }
 }

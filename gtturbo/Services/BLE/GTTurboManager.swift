@@ -26,6 +26,8 @@ public final class GTTurboManager: NSObject, ObservableObject {
     private var modelContext: ModelContext?
     private var currentFileData: Data = Data()
     private var currentFileStartTime: Date?
+    private var uploadTimer: Timer?
+    private let uploadService = FileUploadService()
     
     enum ConnectionState: Equatable {
         case disconnected
@@ -127,6 +129,12 @@ public final class GTTurboManager: NSObject, ObservableObject {
         )
         dataFiles.append(newFile)
         
+        // Start 45 second timer for this file
+        uploadTimer?.invalidate() // Cancel any existing timer
+        uploadTimer = Timer.scheduledTimer(withTimeInterval: 45.0, repeats: false) { [weak self] _ in
+            self?.uploadCurrentFile()
+        }
+        
         isCollectingData = true
         currentFileStatus = .receiving
     }
@@ -163,6 +171,9 @@ public final class GTTurboManager: NSObject, ObservableObject {
         dataFiles.append(newFile)
         
         peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
+        uploadTimer?.invalidate()
+        uploadTimer = nil
+        
         isCollectingData = false
         currentFileStatus = .none
         currentFileStartTime = nil
@@ -174,6 +185,38 @@ public final class GTTurboManager: NSObject, ObservableObject {
     
     private func getDocumentsDirectory() -> URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+    
+    // Add new method for file upload
+    private func uploadCurrentFile() {
+        guard let lastFile = dataFiles.last,
+              lastFile.status == .receiving else { return }
+        
+        // Update status to uploading
+        if let index = dataFiles.firstIndex(where: { $0.id == lastFile.id }) {
+            dataFiles[index].status = .uploading
+            
+            // Start upload
+            Task {
+                do {
+                    let success = try await uploadService.uploadFile(at: lastFile.filePath)
+                    DispatchQueue.main.async {
+                        if success {
+                            self.dataFiles[index].status = .uploaded
+                        } else {
+                            self.dataFiles[index].status = .receiving
+                        }
+                        self.objectWillChange.send()
+                    }
+                } catch {
+                    print("❌ Upload failed: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        self.dataFiles[index].status = .receiving
+                        self.objectWillChange.send()
+                    }
+                }
+            }
+        }
     }
 }
 
