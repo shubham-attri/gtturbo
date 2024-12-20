@@ -70,6 +70,7 @@ struct ContentView: View {
     @State private var isCollectingData = false
     @State private var showStartConfirmation = false
     @State private var showStopConfirmation = false
+    @State private var buttonsDisabled = false
     
     var body: some View {
         NavigationSplitView {
@@ -147,10 +148,15 @@ struct ContentView: View {
                     Section {
                         VStack(spacing: 24) {  // Increased spacing between buttons
                             // Start Button - Sends timestamp
-                            Button {
+                            Button(action: {
+                                buttonsDisabled = true
                                 bleManager.startMeasurement()
-                                logAction("Sent timestamp to GT TURBO")
-                            } label: {
+                                
+                                // Re-enable after 10 seconds
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                                    buttonsDisabled = false
+                                }
+                            }) {
                                 HStack {
                                     Image(systemName: "play.circle.fill")
                                         .font(.system(size: 24))
@@ -165,12 +171,19 @@ struct ContentView: View {
                             }
                             .buttonStyle(BorderlessButtonStyle())  // Prevents tap area expansion
                             .contentShape(Rectangle())  // Defines precise tap area
+                            .disabled(bleManager.connectionState != .connected || buttonsDisabled)
+                            .opacity(buttonsDisabled ? 0.5 : 1.0)
 
                             // Stop Button - Sends 0x02
-                            Button {
+                            Button(action: {
+                                buttonsDisabled = true
                                 bleManager.stopMeasurement()
-                                logAction("Sent STOP command (0x02) to GT TURBO")
-                            } label: {
+                                
+                                // Re-enable after 10 seconds
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                                    buttonsDisabled = false
+                                }
+                            }) {
                                 HStack {
                                     Image(systemName: "stop.circle.fill")
                                         .font(.system(size: 24))
@@ -185,6 +198,8 @@ struct ContentView: View {
                             }
                             .buttonStyle(BorderlessButtonStyle())  // Prevents tap area expansion
                             .contentShape(Rectangle())  // Defines precise tap area
+                            .disabled(bleManager.connectionState != .connected || buttonsDisabled)
+                            .opacity(buttonsDisabled ? 0.5 : 1.0)
                         }
                         .padding(.vertical, 8)
                     } header: {

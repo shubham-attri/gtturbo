@@ -146,6 +146,22 @@ public final class GTTurboManager: NSObject, ObservableObject {
         print("🔴 Stopping measurement...")
         let command: [UInt8] = [BLEConstants.stopCommand]
         
+        // Create a file for stop command data
+        let stopTime = Date()
+        let fileName = "measurement_stop_\(stopTime.timeIntervalSince1970).dat"
+        let fileURL = getDocumentsDirectory().appendingPathComponent(fileName)
+        
+        // Create file and write stop command
+        try? Data(command).write(to: fileURL)
+        
+        let newFile = DataFile(
+            timestamp: stopTime,
+            deviceId: peripheral.name ?? "GT TURBO",
+            filePath: fileURL,
+            status: .receiving
+        )
+        dataFiles.append(newFile)
+        
         peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
         isCollectingData = false
         currentFileStatus = .none
