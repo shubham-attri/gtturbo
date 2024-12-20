@@ -11,11 +11,11 @@ The GT TURBO NIR Spectrography System is a comprehensive solution for collecting
   - SwiftData for local data persistence
   - URLSession for server communication
 
-- **Microcontroller**:
-  - Arduino-based firmware
-  - Adafruit Bluefruit library for BLE
-  - AS7265X sensor integration
-  - SPI Flash for data storage
+- **Server Infrastructure**:
+  - Python FastAPI backend
+  - Raw file storage system
+  - Nginx reverse proxy
+  - ngrok secure tunneling
 
 ## Architecture Components
 
@@ -46,9 +46,9 @@ The GT TURBO NIR Spectrography System is a comprehensive solution for collecting
   - Handles notifications
 
 ### 2. Data Layer
-#### Data Storage
-- SwiftData for structured data persistence
-- FileManager for raw measurement data
+#### File Storage
+- Local file system for measurement data
+- Raw data preservation
 - Unique file creation per measurement
 - Automatic file management system
 
@@ -100,7 +100,7 @@ The GT TURBO NIR Spectrography System is a comprehensive solution for collecting
 
 3. **Data Collection**:
    - NIR spectral data reception
-   - Real-time data storage
+   - Raw data file storage
    - File system management
    - UI status updates
 
@@ -110,18 +110,34 @@ The GT TURBO NIR Spectrography System is a comprehensive solution for collecting
    - Upload timer initiation
    - Status updates
 
-5. **Data Upload**:
+5. **File Upload**:
    - 45-second delay timer
    - Server communication
-   - Upload status tracking
-   - Error handling
+   - Raw file upload
+   - Status tracking
 
-## Security Considerations
-- Secure BLE communication
-- Data encryption in transit
-- Secure file storage
-- Error handling and recovery
-- Access control implementation
+## Server Architecture
+
+### File Storage System
+- Hierarchical directory structure
+- Date-based organization
+- Device-specific folders
+- Raw data preservation
+- Simple file naming convention
+
+### API Endpoint
+- Single endpoint for file upload (/upload-file/)
+- Handles multipart form data
+- Processes raw measurement files
+- Returns upload status
+
+### Security Implementation
+- HTTPS encryption
+- ngrok secure tunneling
+- Request validation
+- File verification
+- Upload size limits
+- Rate limiting
 
 ## Performance Optimization
 - Efficient BLE packet handling
@@ -166,25 +182,25 @@ The GT TURBO NIR Spectrography System is a comprehensive solution for collecting
 │  Hardware    │     Mobile App      │        Server              │
 ├──────────────┼─────────────────────┼────────────────────────────┤
 │ AS7265X      │     SwiftUI        │      FastAPI               │
-│ Arduino      │     Combine        │      SQLite                │
+│ Arduino      │     Combine        │      Raw Files             │
 │ BLE Module   │     CoreBluetooth  │      Nginx                 │
-│              │     SwiftData      │      Docker                │
+│              │     SwiftData      │                           │
 └──────────────┴─────────────────────┴────────────────────────────┘
 ```
 
 ## Data Flow Architecture
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Device    │    │   Mobile    │    │   Server    │    │  Database   │
-│   Layer     │◄──►│    Layer    │◄──►│    Layer    │◄──►│    Layer    │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-      │                   │                  │                  │
-      ▼                   ▼                  ▼                  ▼
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│ NIR Data    │    │ Data        │    │ API         │    │ Measurement  │
-│ Collection  │───►│ Processing  │───►│ Processing  │───►│ Storage     │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Device    │    │   Mobile    │    │   Server    │
+│   Layer     │◄──►│    Layer    │◄──►│    Layer    │
+└─────────────┘    └─────────────┘    └─────────────┘
+      │                   │                  │
+      ▼                   ▼                  ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ NIR Data    │    │ Data        │    │ Raw File    │
+│ Collection  │───►│ Processing  │───►│ Storage     │
+└─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 ## Server Components
@@ -203,19 +219,6 @@ The GT TURBO NIR Spectrography System is a comprehensive solution for collecting
 │ │    Service    │    │   Updates     │ │
 │ └────────────────┘    └───────────────┘ │
 └──────────────────────────────────────────┘
-```
-
-### Database Schema
-```
-┌────────────────────────────────┐
-│         Measurements           │
-├────────────────┬───────────────┤
-│ id             │ TEXT PRIMARY  │
-│ timestamp      │ DATETIME      │
-│ device_id      │ TEXT          │
-│ file_path      │ TEXT          │
-│ status         │ TEXT          │
-└────────────────┴───────────────┘
 ```
 
 ### Server Infrastructure

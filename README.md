@@ -59,15 +59,13 @@ GT TURBO is an iOS application designed for Near-Infrared (NIR) Spectrography me
 ## Server Implementation
 
 ### Backend Architecture
-The server is built using FastAPI, a modern Python web framework, with the following components:
+The server is built using FastAPI, a modern Python web framework, with a single endpoint:
 
-1. **API Endpoints**:
 ```python
 @app.post("/upload-file/")
 async def upload_file(file: UploadFile):
     # Store raw measurement file
     return {"status": "success"}
-
 ```
 
 ### File Storage System
