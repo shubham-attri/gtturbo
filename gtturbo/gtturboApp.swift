@@ -7,9 +7,22 @@
 
 import SwiftUI
 import SwiftData
+import FirebaseCore
+
+// Firebase configuration delegate
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        FirebaseApp.configure()
+        return true
+    }
+}
 
 @main
 struct gtturboApp: App {
+    // Register app delegate for Firebase setup
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    
     let container: ModelContainer
     
     init() {
@@ -24,8 +37,10 @@ struct gtturboApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .modelContainer(container)
+            NavigationView {
+                ContentView()
+                    .modelContainer(container)
+            }
         }
     }
 }
