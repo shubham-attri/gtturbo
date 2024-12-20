@@ -23,9 +23,8 @@ GT TURBO is an iOS application designed for Near-Infrared (NIR) Spectrography me
 
 - **Server Infrastructure**:
   - Python FastAPI backend
-  - SQLite database
+  - Raw file storage system
   - Nginx reverse proxy
-  - Docker containerization
   - ngrok for secure tunneling
 
 ## System Architecture
@@ -51,8 +50,8 @@ GT TURBO is an iOS application designed for Near-Infrared (NIR) Spectrography me
 │  └─────────────┘    └──────┬──────┘              │
 │                            │                      │
 │               ┌────────────┴──────────┐          │
-│               │      Database         │          │
-│               │  (SQLite/File Store)  │          │
+│               │    Raw File Storage   │          │
+│               │                       │          │
 │               └─────────────────────┘           │
 └───────────────────────────────────────────────────┘
 ```
@@ -66,62 +65,23 @@ The server is built using FastAPI, a modern Python web framework, with the follo
 ```python
 @app.post("/upload-file/")
 async def upload_file(file: UploadFile):
-    # File processing logic
+    # Store raw measurement file
     return {"status": "success"}
 
-@app.get("/measurements/")
-async def get_measurements():
-    # Retrieve measurements
-    return measurements
-
-@app.get("/measurement/{id}")
-async def get_measurement(id: str):
-    # Retrieve specific measurement
-    return measurement
 ```
 
-2. **Database Schema**:
-```sql
-CREATE TABLE measurements (
-    id TEXT PRIMARY KEY,
-    timestamp DATETIME,
-    device_id TEXT,
-    file_path TEXT,
-    status TEXT
-);
-```
-
-### Server Setup
-1. **Docker Configuration**:
-```dockerfile
-FROM python:3.9
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-COPY . .
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-2. **Nginx Configuration**:
-```nginx
-server {
-    listen 80;
-    server_name gtturbo.example.com;
-
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+### File Storage System
+- Direct file system storage for measurement data
+- Organized directory structure by date and device ID
+- Raw data preservation for maximum flexibility
+- Simple file naming convention for easy retrieval
 
 ### Data Flow
 1. iOS app collects NIR data
 2. After 45-second delay, initiates file upload
 3. File transmitted via HTTPS through ngrok tunnel
 4. Nginx routes request to FastAPI backend
-5. FastAPI processes and stores data
+5. FastAPI stores raw measurement file
 6. Response sent back to iOS app
 
 ### Security Measures
@@ -135,7 +95,6 @@ server {
 ## Server Deployment
 
 ### Prerequisites
-- Docker and Docker Compose
 - Python 3.9+
 - ngrok account
 - Domain name (optional)
@@ -147,22 +106,26 @@ server {
    cp .env.example .env
    # Edit .env with your settings
    ```
-3. Build and start Docker containers:
+3. Install dependencies:
    ```bash
-   docker-compose up -d
+   pip install -r requirements.txt
    ```
-4. Start ngrok tunnel:
+4. Start FastAPI server:
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+5. Start ngrok tunnel:
    ```bash
    ngrok http 8000
    ```
-5. Update iOS app with new server URL
+6. Update iOS app with new server URL
 
 ### Monitoring
 - Server health checks
 - Request logging
 - Error tracking
-- Performance metrics
-- Storage monitoring
+- Storage space monitoring
+- File integrity verification
 
 ## Architecture
 The application follows a clean architecture pattern with clear separation of concerns:
