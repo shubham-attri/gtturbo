@@ -170,10 +170,13 @@ public final class GTTurboManager: NSObject, ObservableObject {
         )
         dataFiles.append(newFile)
         
-        peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
-        uploadTimer?.invalidate()
-        uploadTimer = nil
+        // Start 45 second timer for this file
+        uploadTimer?.invalidate() // Cancel any existing timer
+        uploadTimer = Timer.scheduledTimer(withTimeInterval: 45.0, repeats: false) { [weak self] _ in
+            self?.uploadCurrentFile()
+        }
         
+        peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
         isCollectingData = false
         currentFileStatus = .none
         currentFileStartTime = nil
