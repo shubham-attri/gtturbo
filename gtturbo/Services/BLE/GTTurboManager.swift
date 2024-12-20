@@ -105,32 +105,30 @@ public final class GTTurboManager: NSObject, ObservableObject {
               let peripheral = peripheral else { return }
         
         print("🟢 Starting measurement...")
-        let command: [UInt8] = [BLEConstants.startCommand]
         
-        // Create a new file for start command
+        // Create a single file for this measurement session
         currentFileStartTime = Date()
-        let fileName = "start_\(currentFileStartTime!.timeIntervalSince1970).dat"
+        let fileName = "measurement_\(currentFileStartTime!.timeIntervalSince1970).dat"
         let fileURL = getDocumentsDirectory().appendingPathComponent(fileName)
         
-        do {
-            try command.withUnsafeBytes { Data($0) }.write(to: fileURL)
-            let newFile = DataFile(
-                timestamp: currentFileStartTime!,
-                deviceId: peripheral.name ?? "GT TURBO",
-                filePath: fileURL,
-                status: .receiving
-            )
-            dataFiles.append(newFile)
-            print("💾 Saved start command file: \(fileName)")
-        } catch {
-            print("❌ Error saving start file: \(error)")
-        }
+        // Send current timestamp to device
+        let currentTimestamp = UInt32(Date().timeIntervalSince1970)
+        let timestampBytes = withUnsafeBytes(of: currentTimestamp) { Array($0) }
+        peripheral.writeValue(Data(timestampBytes), for: characteristic, type: .withResponse)
+        
+        // Create file and write initial timestamp
+        try? Data(timestampBytes).write(to: fileURL)
+        
+        let newFile = DataFile(
+            timestamp: currentFileStartTime!,
+            deviceId: peripheral.name ?? "GT TURBO",
+            filePath: fileURL,
+            status: .receiving
+        )
+        dataFiles.append(newFile)
         
         isCollectingData = true
         currentFileStatus = .receiving
-        currentFileData = Data()
-        
-        peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
     }
     
     func simulateConnection() {
@@ -148,47 +146,9 @@ public final class GTTurboManager: NSObject, ObservableObject {
         print("🔴 Stopping measurement...")
         let command: [UInt8] = [BLEConstants.stopCommand]
         
-        // Save the data collected during measurement
-        if !currentFileData.isEmpty {
-            let dataFileName = "data_\(Date().timeIntervalSince1970).dat"
-            let dataFileURL = getDocumentsDirectory().appendingPathComponent(dataFileName)
-            
-            do {
-                try currentFileData.write(to: dataFileURL)
-                let dataFile = DataFile(
-                    timestamp: currentFileStartTime ?? Date(),
-                    deviceId: peripheral.name ?? "GT TURBO",
-                    filePath: dataFileURL,
-                    status: .receiving
-                )
-                dataFiles.append(dataFile)
-                print("💾 Saved measurement data file: \(dataFileName) with \(currentFileData.count) bytes")
-            } catch {
-                print("❌ Error saving data file: \(error)")
-            }
-        }
-        
-        // Create a new file for stop command
-        let stopFileName = "stop_\(Date().timeIntervalSince1970).dat"
-        let stopFileURL = getDocumentsDirectory().appendingPathComponent(stopFileName)
-        
-        do {
-            try command.withUnsafeBytes { Data($0) }.write(to: stopFileURL)
-            let stopFile = DataFile(
-                timestamp: Date(),
-                deviceId: peripheral.name ?? "GT TURBO",
-                filePath: stopFileURL,
-                status: .receiving
-            )
-            dataFiles.append(stopFile)
-            print("💾 Saved stop command file: \(stopFileName)")
-        } catch {
-            print("❌ Error saving stop file: \(error)")
-        }
-        
         peripheral.writeValue(Data(command), for: characteristic, type: .withResponse)
         isCollectingData = false
-        currentFileData = Data()
+        currentFileStatus = .none
         currentFileStartTime = nil
     }
     
@@ -278,10 +238,7 @@ extension GTTurboManager: CBPeripheralDelegate {
     }
     
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard error == nil else {
-            print("Error updating value: \(error?.localizedDescription ?? "")")
-            return
-        }
+        guard error == nil else { return }
         
         switch characteristic.uuid.uuidString {
         case BLEConstants.batteryLevelCharUUID:
@@ -289,30 +246,22 @@ extension GTTurboManager: CBPeripheralDelegate {
                 batteryLevel = Int(data[0])
             }
         case BLEConstants.notifyCharUUID:
-            if let data = characteristic.value {
-                // Append data to current file data
-                currentFileData.append(data)
-                print("📦 Received data packet: \(data.count) bytes")
-                
-                // Save data periodically or when it reaches a certain size
-                if currentFileData.count >= 1024 * 10 { // Save every 10KB
-                    let fileName = "data_\(Date().timeIntervalSince1970).dat"
-                    let fileURL = getDocumentsDirectory().appendingPathComponent(fileName)
+            if let data = characteristic.value,
+               let fileURL = dataFiles.last?.filePath {
+                do {
+                    let fileHandle = try FileHandle(forWritingTo: fileURL)
+                    fileHandle.seekToEndOfFile()
+                    fileHandle.write(data)
+                    try fileHandle.close()
                     
-                    do {
-                        try currentFileData.write(to: fileURL)
-                        let newFile = DataFile(
-                            timestamp: currentFileStartTime ?? Date(),
-                            deviceId: peripheral.name ?? "GT TURBO",
-                            filePath: fileURL,
-                            status: .receiving
-                        )
-                        dataFiles.append(newFile)
-                        print("💾 Saved data chunk file: \(fileName) with \(currentFileData.count) bytes")
-                        currentFileData = Data() // Clear the buffer after saving
-                    } catch {
-                        print("❌ Error saving data chunk: \(error)")
+                    // Force UI update
+                    DispatchQueue.main.async {
+                        self.objectWillChange.send()
                     }
+                    
+                    print("📦 Appended \(data.count) bytes to measurement file")
+                } catch {
+                    print("❌ Error writing to file: \(error)")
                 }
             }
         default:

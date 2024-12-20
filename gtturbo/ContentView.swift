@@ -21,6 +21,7 @@ let systemBackground = Color(NSColor.windowBackgroundColor)
 
 struct MeasurementDetailView: View {
     let dataFile: GTTurboManager.DataFile
+    @State private var rawData: String = ""
     
     var body: some View {
         ScrollView {
@@ -36,7 +37,12 @@ struct MeasurementDetailView: View {
                         Text("Raw Data (Hex):")
                             .font(.headline)
                             .padding(.top)
-                        Text(data.map { String(format: "%02x", $0) }.joined(separator: " "))
+                        Text(data.map { String(format: "%02x", $0) }
+                            .enumerated()
+                            .map { index, hex in
+                                index > 0 && index % 16 == 0 ? "\n\(hex)" : "\(hex)"
+                            }
+                            .joined(separator: " "))
                             .font(.system(.body, design: .monospaced))
                             .textSelection(.enabled)
                             .padding()
