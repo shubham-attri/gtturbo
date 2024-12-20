@@ -2,4 +2,6 @@
 .build
 .vscode
 /server
+GoogleService-Info.plist
+/uploaded_files
 # SwiftData
