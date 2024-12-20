@@ -12,28 +12,44 @@ import CoreBluetooth
 import UIKit
 #endif
 
+// Fix UIColor/NSColor reference for cross-platform
+#if os(iOS)
+let systemBackground = Color(UIColor.systemBackground)
+#else
+let systemBackground = Color(NSColor.windowBackgroundColor)
+#endif
+
 struct MeasurementDetailView: View {
-    let item: Item
+    let dataFile: GTTurboManager.DataFile
     
     var body: some View {
-        List {
-            Section("Timestamp") {
-                Text(item.timestamp, format: .dateTime)
-            }
-            
-            Section("Device") {
-                Text(item.deviceId)
-            }
-            
-            Section("Sensor Data") {
-                ForEach(Array(item.sensorData.enumerated()), id: \.offset) { index, value in
-                    HStack {
-                        Text("Sensor \(index + 1)")
-                        Spacer()
-                        Text(String(format: "%.2f", value))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Group {
+                    Text("File: \(dataFile.filePath.lastPathComponent)")
+                        .font(.headline)
+                    Text("Device: \(dataFile.deviceId)")
+                    Text("Timestamp: \(dataFile.timestamp.formatted())")
+                    
+                    if let data = try? Data(contentsOf: dataFile.filePath) {
+                        Text("Size: \(data.count) bytes")
+                        Text("Raw Data (Hex):")
+                            .font(.headline)
+                            .padding(.top)
+                        Text(data.map { String(format: "%02x", $0) }.joined(separator: " "))
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                            .padding()
+                            .background(Color.secondary.opacity(0.1))
+                            .cornerRadius(8)
+                    } else {
+                        Text("Error loading file data")
+                            .foregroundColor(.red)
                     }
                 }
+                .padding(.horizontal)
             }
+            .padding(.vertical)
         }
         .navigationTitle("Measurement Details")
     }
@@ -123,16 +139,16 @@ struct ContentView: View {
                     
                     // Measurement Section - Separate section for measurement controls
                     Section {
-                        VStack(spacing: 16) {
-                            // Start Button
+                        VStack(spacing: 24) {  // Increased spacing between buttons
+                            // Start Button - Sends timestamp
                             Button {
-                                // Show confirmation dialog for starting
-                                showStartConfirmation = true
+                                bleManager.startMeasurement()
+                                logAction("Sent timestamp to GT TURBO")
                             } label: {
                                 HStack {
                                     Image(systemName: "play.circle.fill")
                                         .font(.system(size: 24))
-                                    Text("Start Tracking")
+                                    Text("Start New Tracking")
                                         .font(.headline)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -141,31 +157,18 @@ struct ContentView: View {
                                 .foregroundColor(.white)
                                 .cornerRadius(12)
                             }
-                            .disabled(isCollectingData)
-                            .confirmationDialog(
-                                "Start Tracking",
-                                isPresented: $showStartConfirmation,
-                                titleVisibility: .visible
-                            ) {
-                                Button("Start") {
-                                    isCollectingData = true
-                                    bleManager.startMeasurement()
-                                    logAction("Started measurement")
-                                }
-                                Button("Cancel", role: .cancel) {}
-                            } message: {
-                                Text("Do you want to start tracking measurements?")
-                            }
-                            
-                            // Stop Button
+                            .buttonStyle(BorderlessButtonStyle())  // Prevents tap area expansion
+                            .contentShape(Rectangle())  // Defines precise tap area
+
+                            // Stop Button - Sends 0x02
                             Button {
-                                // Show confirmation dialog for stopping
-                                showStopConfirmation = true
+                                bleManager.stopMeasurement()
+                                logAction("Sent STOP command (0x02) to GT TURBO")
                             } label: {
                                 HStack {
                                     Image(systemName: "stop.circle.fill")
                                         .font(.system(size: 24))
-                                    Text("Stop Tracking")
+                                    Text("Stop Current Tracking")
                                         .font(.headline)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -174,114 +177,96 @@ struct ContentView: View {
                                 .foregroundColor(.white)
                                 .cornerRadius(12)
                             }
-                            .disabled(!isCollectingData)
-                            .confirmationDialog(
-                                "Stop Tracking",
-                                isPresented: $showStopConfirmation,
-                                titleVisibility: .visible
-                            ) {
-                                Button("Stop", role: .destructive) {
-                                    isCollectingData = false
-                                    bleManager.stopMeasurement()
-                                    logAction("Stopped measurement")
-                                }
-                                Button("Cancel", role: .cancel) {}
-                            } message: {
-                                Text("Are you sure you want to stop tracking?")
-                            }
+                            .buttonStyle(BorderlessButtonStyle())  // Prevents tap area expansion
+                            .contentShape(Rectangle())  // Defines precise tap area
                         }
                         .padding(.vertical, 8)
                     } header: {
-                        Text("Tracking")
+                        Text("Tracking Controls")
                     }
                 }
                 
                 // Measurements Section
                 Section {
-                    if items.isEmpty {
-                        Text("No measurements recorded")
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(items) { item in
-                            NavigationLink {
-                                MeasurementDetailView(item: item)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(item.timestamp, format: .dateTime)
+                    ForEach(bleManager.dataFiles) { file in
+                        NavigationLink(destination: MeasurementDetailView(dataFile: file)) {
+                            HStack {
+                                Circle()
+                                    .fill(statusColor(for: file.status))
+                                    .frame(width: 8, height: 8)
+                                
+                                VStack(alignment: .leading) {
+                                    Text(file.timestamp, format: .dateTime)
                                         .font(.headline)
-                                    Text("Device: \(item.deviceId)")
+                                    Text(file.deviceId)
+                                        .font(.caption)
+                                }
+                                
+                                Spacer()
+                                
+                                // Add file size
+                                if let size = try? FileManager.default.attributesOfItem(atPath: file.filePath.path)[.size] as? Int64 {
+                                    Text("\(size) bytes")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
                             }
                         }
-                        .onDelete(perform: deleteItems)
                     }
                 } header: {
-                    Text("Recent Measurements")
+                    Text("Measurement Files")
                 }
                 
                 // Debug Console Section
                 Section {
                     VStack(spacing: 12) {
-                        // Console Output
                         ScrollView {
                             VStack(alignment: .leading, spacing: 8) {
-                                ForEach(debugLogs) { log in
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        // Timestamp
-                                        Text(log.timestamp.formatted(.dateTime.hour().minute().second()))
-                                            .font(.system(.caption2, design: .monospaced))
-                                            .foregroundColor(.secondary)
-                                        
-                                        // Log Message
-                                        Text(log.message)
-                                            .font(.system(.caption, design: .monospaced))
+                                ForEach(debugLogs.reversed()) { log in
+                                    HStack(spacing: 8) {
+                                        // Icon based on log type
+                                        Image(systemName: logIcon(for: log.message))
                                             .foregroundColor(logColor(for: log.message))
-                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .frame(width: 24)
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(log.timestamp.formatted(.dateTime.hour().minute().second()))
+                                                .font(.system(.caption2, design: .monospaced))
+                                                .foregroundColor(.secondary)
+                                            Text(log.message)
+                                                .font(.system(.callout, design: .monospaced))
+                                                .foregroundColor(logColor(for: log.message))
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
                                     }
-                                    .padding(8)
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.secondary.opacity(0.1))
-                                    .cornerRadius(6)
+                                    .padding(12)
+                                    .background(systemBackground)
+                                    .cornerRadius(8)
+                                    .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
                                 }
                             }
-                            .padding(.vertical, 4)
+                            .padding(8)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: 200)
-                        .background(Color.black.opacity(0.05))
-                        .cornerRadius(8)
-                        
-                        // Control Buttons
-                        HStack {
-                            Button(action: clearLogs) {
-                                Label("Clear", systemImage: "trash")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.borderless)
-                            
-                            Spacer()
-                            
-                            Button(action: copyLogs) {
-                                Label("Copy", systemImage: "doc.on.doc")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.borderless)
-                        }
-                        .padding(.horizontal, 4)
+                        .frame(maxHeight: 300)
                     }
                 } header: {
                     HStack {
                         Text("Debug Console")
                         Spacer()
-                        Text("\(debugLogs.count) entries")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        Button(action: clearLogs) {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(BorderlessButtonStyle())
                     }
                 }
             }
         } detail: {
             Text("Select a measurement")
+        }
+        .onAppear {
+            // Pass ModelContext to GTTurboManager for data storage
+            bleManager.setModelContext(modelContext)
         }
     }
     
@@ -308,6 +293,9 @@ struct ContentView: View {
     
     private func logAction(_ message: String) {
         let log = DebugLog(timestamp: Date(), message: message)
+        if debugLogs.count >= 100 { // Limit log entries
+            debugLogs.removeFirst()
+        }
         debugLogs.append(log)
     }
     
@@ -358,6 +346,32 @@ struct ContentView: View {
         UIPasteboard.general.string = logText
         #endif
     }
+    
+    private func logIcon(for message: String) -> String {
+        if message.contains("timestamp") {
+            return "arrow.up.circle.fill"
+        } else if message.contains("Received") {
+            return "arrow.down.circle.fill"
+        } else if message.contains("Error") || message.contains("Failed") {
+            return "exclamationmark.circle.fill"
+        } else if message.contains("Connected") {
+            return "link.circle.fill"
+        } else if message.contains("Started") {
+            return "play.circle.fill"
+        } else if message.contains("Stopped") {
+            return "stop.circle.fill"
+        }
+        return "info.circle.fill"
+    }
+    
+    private func statusColor(for status: GTTurboManager.FileStatus) -> Color {
+        switch status {
+        case .receiving: return .red
+        case .uploading: return .yellow
+        case .uploaded: return .green
+        case .none: return .gray
+        }
+    }
 }
 
 struct BatteryIndicator: View {
@@ -399,7 +413,7 @@ struct DebugLog: Identifiable {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: Item.self, configurations: config)
     
-    ContentView()
+    return ContentView()
         .modelContainer(container)
         .onAppear {
             let context = container.mainContext

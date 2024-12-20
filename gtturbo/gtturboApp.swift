@@ -14,7 +14,7 @@ struct gtturboApp: App {
     
     init() {
         do {
-            let schema = Schema([Item.self])
+            let schema = Schema([gtturbo.Item.self])
             let config = ModelConfiguration("GTTurbo", schema: schema)
             container = try ModelContainer(for: schema, configurations: config)
         } catch {
