@@ -131,7 +131,7 @@ public final class GTTurboManager: NSObject, ObservableObject {
         
         // Start 45 second timer for this file
         uploadTimer?.invalidate() // Cancel any existing timer
-        uploadTimer = Timer.scheduledTimer(withTimeInterval: 45.0, repeats: false) { [weak self] _ in
+        uploadTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { [weak self] _ in
             self?.uploadCurrentFile()
         }
         
@@ -172,7 +172,7 @@ public final class GTTurboManager: NSObject, ObservableObject {
         
         // Start 45 second timer for this file
         uploadTimer?.invalidate() // Cancel any existing timer
-        uploadTimer = Timer.scheduledTimer(withTimeInterval: 45.0, repeats: false) { [weak self] _ in
+        uploadTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { [weak self] _ in
             self?.uploadCurrentFile()
         }
         
