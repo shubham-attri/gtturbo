@@ -168,7 +168,7 @@ fun ControlScreen(
                         contentColor = Color.White
                     ),
                     modifier = Modifier.weight(1f),
-                    enabled = !isDataCollectionActive && !fileStoredSuccessfully && !isUploading
+                    enabled = !sessionStarted && !isDataCollectionActive && !fileStoredSuccessfully && !isUploading
                 ) {
                     Text(
                         text = "START",

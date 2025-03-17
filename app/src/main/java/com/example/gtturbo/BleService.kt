@@ -53,6 +53,10 @@ private const val TARGET_DEVICE_NAME = "GT TURBO"
 // Server endpoint URL
 private const val UPLOAD_SERVER_URL = "https://pro-physically-squirrel.ngrok-free.app/upload-file/"
 
+// Upload retry configuration
+private const val MAX_UPLOAD_RETRIES = 10
+private const val UPLOAD_RETRY_DELAY_MS = 5000L
+
 // Standard GATT Battery Service UUID
 private val BATTERY_SERVICE_UUID = UUID.fromString("0000180F-0000-1000-8000-00805F9B34FB")
 // Standard Battery Level Characteristic UUID
@@ -110,12 +114,41 @@ class BleService(private val context: Context) {
     private val NOTIFICATION_TIMEOUT = 5000L // 5 seconds timeout
     private var lastNotificationTime = 0L
     
+    // Upload retry tracking
+    private var uploadRetryCount = 0
+    private var uploadRetryHandler: Handler = Handler(Looper.getMainLooper())
+    private var currentUploadFile: File? = null
+    private val pendingUploads = mutableListOf<File>()
+    
+    // Session manager for persistent session state
+    private val sessionManager = SessionManager(context)
+    
     // HTTP client for file uploads
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    init {
+        // Check for active sessions when the service is created
+        checkForActiveSessions()
+    }
+    
+    // Check for active sessions from persistent storage
+    private fun checkForActiveSessions() {
+        // Check both SharedPreferences and file system for active sessions
+        val hasActiveSession = sessionManager.isSessionActive() || sessionManager.checkForActiveSessionsInFileSystem()
+        
+        if (hasActiveSession) {
+            Log.d(TAG, "Found active session in persistent storage")
+            sessionStarted.value = true
+            sessionStatusMessage.value = "Ongoing session detected"
+        } else {
+            Log.d(TAG, "No active session found in persistent storage")
+            sessionStarted.value = false
+        }
+    }
 
     enum class ScanState {
         NOT_SCANNING,
@@ -184,6 +217,7 @@ class BleService(private val context: Context) {
     @SuppressLint("MissingPermission")
     fun disconnect() {
         removePendingCallbacks()
+        clearUploadRetryState()
         bluetoothGatt?.disconnect()
         bluetoothGatt?.close()
         bluetoothGatt = null
@@ -279,7 +313,11 @@ class BleService(private val context: Context) {
             gatt.writeCharacteristic(commandCharacteristic)
         }
         
+        // Update both in-memory and persistent session state
         sessionStarted.value = true
+        sessionManager.startSession()
+        sessionManager.createSessionMarkerFile()
+        
         sessionStatusMessage.value = "Session started successfully!"
         Log.d(TAG, "Session timestamp written: $timestamp")
         
@@ -493,7 +531,7 @@ class BleService(private val context: Context) {
                 val jsonObject = JSONObject()
                 jsonObject.put("notification_number", index)
                 
-                // Convert byte array to Base64 string for JSON storage
+                // Convert byte array to hex string for JSON storage
                 val dataString = notificationData.toHexString()
                 jsonObject.put("notification_value", dataString)
                 
@@ -527,10 +565,21 @@ class BleService(private val context: Context) {
                 Log.d(TAG, "Data saved to file: ${file.absolutePath}")
                 fileStatusMessage.value = "Session ended and file saved successfully!"
                 fileStoredSuccessfully.value = true
+                
+                // End the session in persistent storage
                 sessionStarted.value = false
+                sessionManager.endSession(filename)
+                sessionManager.removeSessionMarkerFile()
                 isDataCollectionActive.value = false
                 
-                // Upload the file to the server
+                // Check for any pending uploads from previous sessions
+                val pendingUploadFiles = loadPendingUploads()
+                if (pendingUploadFiles.isNotEmpty()) {
+                    Log.d(TAG, "Found ${pendingUploadFiles.size} pending uploads from previous sessions")
+                    pendingUploads.addAll(pendingUploadFiles)
+                }
+                
+                // Upload the current file
                 uploadFileToServer(file)
             } else {
                 fileStatusMessage.value = "Error: Could not access storage"
@@ -554,7 +603,13 @@ class BleService(private val context: Context) {
         
         isUploading.value = true
         uploadStatusMessage.value = "Uploading data to server..."
+        currentUploadFile = file
+        uploadRetryCount = 0
         
+        performUpload(file)
+    }
+    
+    private fun performUpload(file: File) {
         // Create request body
         val requestBody = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
@@ -574,10 +629,24 @@ class BleService(private val context: Context) {
         // Execute the request asynchronously
         okHttpClient.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                Log.e(TAG, "Upload failed", e)
+                Log.e(TAG, "Upload failed: ${e.message}", e)
                 handler.post {
-                    isUploading.value = false
-                    uploadStatusMessage.value = "Upload failed: ${e.message}"
+                    if (uploadRetryCount < MAX_UPLOAD_RETRIES) {
+                        // Schedule retry after delay
+                        uploadRetryCount++
+                        uploadStatusMessage.value = "Upload failed, retrying (${uploadRetryCount}/${MAX_UPLOAD_RETRIES})..."
+                        Log.d(TAG, "Will retry upload in $UPLOAD_RETRY_DELAY_MS ms (attempt ${uploadRetryCount}/${MAX_UPLOAD_RETRIES})")
+                        
+                        uploadRetryHandler.postDelayed({
+                            performUpload(file)
+                        }, UPLOAD_RETRY_DELAY_MS)
+                    } else {
+                        // Max retries reached, store for next session
+                        isUploading.value = false
+                        uploadStatusMessage.value = "Upload failed after $MAX_UPLOAD_RETRIES attempts. Will retry in next session."
+                        storePendingUpload(file)
+                        processPendingUploads()
+                    }
                 }
             }
             
@@ -588,13 +657,87 @@ class BleService(private val context: Context) {
                 Log.d(TAG, "Upload response: $success, ${response.code}")
                 
                 handler.post {
-                    isUploading.value = false
-                    uploadStatusMessage.value = message
+                    if (success) {
+                        isUploading.value = false
+                        uploadStatusMessage.value = message
+                        currentUploadFile = null
+                        
+                        // Try to upload any pending files from previous sessions
+                        processPendingUploads()
+                    } else if (uploadRetryCount < MAX_UPLOAD_RETRIES) {
+                        // Schedule retry after delay
+                        uploadRetryCount++
+                        uploadStatusMessage.value = "Upload failed (HTTP ${response.code}), retrying (${uploadRetryCount}/${MAX_UPLOAD_RETRIES})..."
+                        Log.d(TAG, "Will retry upload in $UPLOAD_RETRY_DELAY_MS ms (attempt ${uploadRetryCount}/${MAX_UPLOAD_RETRIES})")
+                        
+                        uploadRetryHandler.postDelayed({
+                            performUpload(file)
+                        }, UPLOAD_RETRY_DELAY_MS)
+                    } else {
+                        // Max retries reached, store for next session
+                        isUploading.value = false
+                        uploadStatusMessage.value = "Upload failed after $MAX_UPLOAD_RETRIES attempts. Will retry in next session."
+                        storePendingUpload(file)
+                        processPendingUploads()
+                    }
                 }
                 
                 response.close()
             }
         })
+    }
+    
+    private fun processPendingUploads() {
+        if (pendingUploads.isEmpty()) {
+            return
+        }
+        
+        val nextFile = pendingUploads.removeFirstOrNull()
+        if (nextFile != null && nextFile.exists()) {
+            Log.d(TAG, "Processing pending upload: ${nextFile.name}")
+            uploadStatusMessage.value = "Uploading previous session data: ${nextFile.name}"
+            isUploading.value = true
+            currentUploadFile = nextFile
+            uploadRetryCount = 0
+            performUpload(nextFile)
+        } else {
+            // If file doesn't exist, remove it and try the next one
+            processPendingUploads()
+        }
+    }
+    
+    private fun storePendingUpload(file: File) {
+        // Add to pending uploads if not already there
+        if (!pendingUploads.contains(file)) {
+            pendingUploads.add(file)
+        }
+        
+        // Save the list of pending uploads to shared preferences
+        val pendingUploadPaths = pendingUploads.map { it.absolutePath }
+        
+        val prefs = context.getSharedPreferences("gtturbo_uploads", Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putStringSet("pending_uploads", pendingUploadPaths.toSet())
+            apply()
+        }
+        
+        Log.d(TAG, "Stored ${pendingUploads.size} pending uploads for next session")
+    }
+    
+    private fun loadPendingUploads(): List<File> {
+        val prefs = context.getSharedPreferences("gtturbo_uploads", Context.MODE_PRIVATE)
+        val pendingUploadPaths = prefs.getStringSet("pending_uploads", setOf()) ?: setOf()
+        
+        return pendingUploadPaths.mapNotNull { path ->
+            val file = File(path)
+            if (file.exists()) file else null
+        }
+    }
+    
+    private fun clearUploadRetryState() {
+        uploadRetryHandler.removeCallbacksAndMessages(null)
+        uploadRetryCount = 0
+        currentUploadFile = null
     }
     
     // Encode timestamp according to the provided algorithm

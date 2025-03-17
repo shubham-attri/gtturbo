@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 *.iml
 .gradle
 /local.properties
@@ -13,3 +14,12 @@
 .externalNativeBuild
 .cxx
 local.properties
+=======
+.DS_Store
+.build
+.vscode
+/server
+GoogleService-Info.plist
+/uploaded_files
+# SwiftData
+>>>>>>> 20f099ed5473a77cab82f58269061a1e2aa7eda2
