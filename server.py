@@ -1,5 +1,6 @@
 from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse
 import os
 
 app = FastAPI(
@@ -54,14 +55,44 @@ async def server_info():
         "message": "Server is running and accessible via ngrok.",
     }
 
+
+
 # Run the server : python3 server.py
 # ngrok http --hostname=pro-physically-squirrel.ngrok-free.app 9000
+
+
+# Download Processed File endpoint
+@app.get(
+    "/download-file/{filename}",
+    summary="Download Processed File",
+    description="Download a CSV file from the processed_output directory.",
+    tags=["Processed Files"]
+)
+async def download_file(filename: str):
+    processed_dir = "./processed_output"
+    file_path = os.path.join(processed_dir, filename)
+
+    if not os.path.exists(file_path):
+        return JSONResponse(content={"error": "File not found."}, status_code=404)
+
+    return FileResponse(path=file_path, filename=filename, media_type='text/csv')
+
+
+# List all processed CSV files in the processed_output directory
+@app.get(
+    "/list-processed-files/",
+    summary="List Processed CSV Files",
+    description="Returns a list of all CSV files in the processed_output directory.",
+    tags=["Processed Files"]
+)
+async def list_processed_files():
+    processed_dir = "processed_output"
+    os.makedirs(processed_dir, exist_ok=True)
+    files = [f for f in os.listdir(processed_dir) ]
+    return JSONResponse(content={"processed_files": files}, status_code=200)
 
 
 if __name__ == "__main__":
     import uvicorn
     # Host the app on all interfaces to allow ngrok access
     uvicorn.run(app, host="0.0.0.0", port=9000)
-
-
-

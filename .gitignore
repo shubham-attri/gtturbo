@@ -5,3 +5,5 @@
 GoogleService-Info.plist
 /uploaded_files
 # SwiftData
+venv/
+__pycache__/

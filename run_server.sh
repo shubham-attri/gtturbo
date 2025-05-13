@@ -7,6 +7,9 @@ source venv/bin/activate
 # Install required packages
 pip install fastapi uvicorn python-multipart
 
+#Run Decoding Script
+nohup python decode.py > decode.log 2>&1 &
+
 # Start the FastAPI server in the background
 nohup uvicorn server:app --host 0.0.0.0 --port 9000 > server.log 2>&1 &
 

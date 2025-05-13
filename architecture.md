@@ -131,6 +131,17 @@ The GT TURBO NIR Spectrography System is a comprehensive solution for collecting
 - Processes raw measurement files
 - Returns upload status
 
+### New API Endpoints
+- **/list-processed-files/**:
+  - Method: GET
+  - Description: Lists all CSV files in the `processed_output` directory.
+  - Response: JSON containing a list of file names.
+
+- **/download-file/{filename}**:
+  - Method: GET
+  - Description: Downloads the specified CSV file from the `processed_output` directory.
+  - Response: Returns the CSV file as a downloadable attachment.
+
 ### Security Implementation
 - HTTPS encryption
 - ngrok secure tunneling
@@ -235,5 +246,5 @@ The GT TURBO NIR Spectrography System is a comprehensive solution for collecting
 │                      └──────────────┘  │
 └─────────────────────────────────────────┘
 ```
-CHVGfRxvK38EgRi
+
 

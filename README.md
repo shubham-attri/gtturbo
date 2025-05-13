@@ -214,11 +214,28 @@ The application follows a clean architecture pattern with clear separation of co
 3. File will automatically upload after 45 seconds
 4. Check upload status in recent measurements
 
+
 ## Development References
 - [Apple CoreBluetooth Documentation](https://developer.apple.com/documentation/corebluetooth)
 - [iOS-nRF-Toolbox](https://github.com/NordicSemiconductor/IOS-nRF-Toolbox)
 - [Apple SwiftUI Documentation](https://developer.apple.com/documentation/swiftui)
 - [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines)
+
+## Processed File Access
+
+The server exposes two endpoints to interact with processed CSV files:
+
+- **List Files**:
+  ```bash
+   curl -L https://pro-physically-squirrel.ngrok-free.app/list-processed-files/
+  ```
+
+- **Download a File**:
+  ```bash
+  curl -O https://pro-physically-squirrel.ngrok-free.app/download-file/GT_TURBO_3fa1edc9820a7229_20250510_145045.csv
+  ```
+
+Replace `<filename>.csv` with the actual name of the file you want to download.
 
 ## Contributing
 Contributions are welcome! Please read our contributing guidelines and submit pull requests for any enhancements.

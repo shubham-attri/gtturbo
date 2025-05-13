@@ -1,0 +1,10 @@
+INFO:     Started server process [45137]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit)
+INFO:     49.36.137.243:0 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     2405:201:4002:4047:4d3:f1c8:ad73:fe6c:0 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     2405:201:4002:4047:4d3:f1c8:ad73:fe6c:0 - "GET /apple-touch-icon.png HTTP/1.1" 404 Not Found
+INFO:     2405:201:4002:4047:4d3:f1c8:ad73:fe6c:0 - "GET /apple-touch-icon-precomposed.png HTTP/1.1" 404 Not Found
+INFO:     2405:201:4002:4047:6131:7710:cf9b:3113:0 - "GET /list-processed-files/ HTTP/1.1" 200 OK
+INFO:     2405:201:4002:4047:3d12:7476:65e3:28be:0 - "GET /download-file/GT_TURBO_3fa1edc9820a7229_20250510_145045.csv HTTP/1.1" 200 OK
